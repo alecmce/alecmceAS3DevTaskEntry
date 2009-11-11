@@ -1,7 +1,7 @@
 /*
 	The MIT License
 
-	Copyright (c) 2009 Mike Chambers
+	Copyright (c) 2009 Alec McEachran
 
 	Permission is hereby granted, free of charge, to any person obtaining a copy
 	of this software and associated documentation files (the "Software"), to deal
@@ -26,33 +26,59 @@ package
 {
 	import flash.display.DisplayObject;
 	import flash.geom.Rectangle;
-	import flash.utils.Dictionary;	
-
+	
+	
+	/**
+	 * ProximityManager which attempts to satisfy the criteria of Mike Chambers' competition:
+	 * 
+	 * @see http://www.mikechambers.com/blog/2009/11/10/actionscript-3-development-task-contest-1/
+	 * 
+	 * This implementation seeks generates an array of GridSquare objects which each contains a neighbour
+	 * list of adjacent squares. A GridSquare's position i in the array is found by: i = x + y * columns
+	 * where (x,y) is the 0-based position of the grid on an x-y plane, and columns is the number of columns
+	 * in the grid.
+	 * 
+	 * The neighbours of an object is found by concatenating the member lists of the GridSquare under a displayobject
+	 * and the GridSquare's neighbours.
+	 * 
+	 * @see GridSquare for more details
+	 * 
+	 * @author Alec McEachran
+	 */
 	public class ProximityManager
 	{
+		/** the edge-length of the grid squares */
 		private var _gridSize:uint;
 		
+		/** 1/_gridSize, which is used to avoid division calculations */
 		private var _inverseGridSize:Number;
 		
-		private var _bounds:Rectangle;
-		
+		/** the number of columns in the grid */
 		private var _columns:int;
 		
+		/** the number of rows in the grid */
 		private var _rows:int;
 		
+		/** the total number of squares in the grid */
+		private var _count:int;
+		
+		/** an array of grid squares */
 		private var _grid:Vector.<GridSquare>;
 		
-		private var _gridReference:Dictionary;
-		
-		public function ProximityManager(gridSize:uint, bounds:Rectangle = null)
+		/**
+		 * Class Constructor
+		 * 
+		 * @param gridSize The size of the edge of the squares into which the rectangular bounds is divided
+		 * @param bounds The rectangular bounds of the grid
+		 */
+		public function ProximityManager(gridSize:uint, bounds:Rectangle)
 		{
 			_gridSize = gridSize;
 			_inverseGridSize = 1 / _gridSize;
-			_bounds = bounds;
-			_columns = (_bounds.width * _inverseGridSize) + 1;
-			_rows = (_bounds.height * _inverseGridSize) + 1;
-			_grid = new Vector.<GridSquare>(_rows * _columns);
-			_gridReference = new Dictionary(true);
+			_columns = (bounds.width * _inverseGridSize) + 1;
+			_rows = (bounds.height * _inverseGridSize) + 1;
+			_count = _columns * _rows;
+			_grid = new Vector.<GridSquare>(_count);
 			
 			generateGrid();
 		}
@@ -61,9 +87,11 @@ package
 		*	Returns all display objects in the current and adjacent grid cells of the
 		*	specified display object.
 		*/
-		public function getNeighbors(displayObject:DisplayObject):Vector.<DisplayObject>
+		public function getNeighbors(object:DisplayObject):Vector.<DisplayObject>
 		{
-			var square:GridSquare = _gridReference[displayObject];
+			var n:int = int(object.x * _inverseGridSize) + _columns * int(object.y * _inverseGridSize);
+			var square:GridSquare = _grid[n];
+			
 			return square.getNeighbours();
 		}
 		
@@ -72,24 +100,37 @@ package
 		*/
 		public function update(objects:Vector.<DisplayObject>):void
 		{
+			var i:int = _count;
+			while (i--)
+				_grid[i].reset();
+			
 			var i:int = objects.length;
 			while (i--)
 			{
 				var object:DisplayObject = objects[i];
-				var n:int = (object.x + object.y * _columns) * _inverseGridSize;
+				var n:int = int(object.x * _inverseGridSize) + _columns * int(object.y * _inverseGridSize);
 				
 				_grid[n].addMember(object);
-				_gridReference[object] = _grid[n];
 			}
 		}
 		
-		
+		/**
+		 * retrieves a square by its x,y coordinates; used to sanity-test the result of the generateGrid
+		 * method, below
+		 * 
+		 * @param x The horizontal-index of the desired grid square
+		 * @param y The vertical-index of the desired grid square
+		 * @return The resultant grid square
+		 */
 		internal function getSquare(x:int, y:int):GridSquare
 		{
 			return _grid[y * _columns + x];
 		}
-
 		
+		/**
+		 * generate a grid of GridSquare objects which are joined to all other GridSquare objects that
+		 * are adjacent to them (including diagonals)
+		 */
 		private function generateGrid():void
 		{
 			var g:GridSquare;
@@ -138,11 +179,19 @@ package
 			}
 		}
 		
+		
+		/**
+		 * joins two squares together by adding them to each other's neighbour list
+		 * 
+		 * @param a A GridSquare
+		 * @param b A GridSquare
+		 */
 		private function linkSquares(a:GridSquare, b:GridSquare):void
 		{
 			a.addNeighbour(b);
 			b.addNeighbour(a);
 		}
+		
 	}
 }
 
